@@ -3,3 +3,7 @@ ultralytics
 pillow
 opencv-python-headless
 gunicorn
+ultralytics
+torch
+numpy
+
