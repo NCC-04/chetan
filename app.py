@@ -7,7 +7,7 @@ from collections import Counter
 import os
 
 app = Flask(__name__)
-
+os.environ["YOLO_CONFIG_DIR"] = os.environ.get("YOLO_CONFIG_DIR", "/tmp/ultralytics")
 # Load YOLO model
 MODEL_PATH = os.path.join(os.path.dirname(__file__), "yolov8s.pt")
 model = YOLO(MODEL_PATH)  # Pretrained YOLOv8s model
@@ -49,4 +49,5 @@ def predict():
 # Run Flask on Render
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
+
     app.run(host="0.0.0.0", port=port)
