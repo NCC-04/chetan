@@ -1,27 +1,19 @@
-import os
-import io
-import base64
 from flask import Flask, render_template, request, jsonify
 from ultralytics import YOLO
 from PIL import Image
-import cv2
-import numpy as np
+import io, base64, cv2, os
 from collections import Counter
 
 app = Flask(__name__)
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
+app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # Max upload size: 5MB
 
-# Ensure YOLO config directory works on Render
-os.environ["YOLO_CONFIG_DIR"] = os.environ.get("YOLO_CONFIG_DIR", "/tmp/ultralytics")
-
-# Auto-download nano model (fastest for CPU)
-model = YOLO("yolov8n.pt")
-
+# Load YOLO model
+MODEL_PATH = os.path.join(os.path.dirname(__file__), "yolov8s.pt")
+model = YOLO(MODEL_PATH)
 
 @app.route("/")
 def index():
     return render_template("index.html")
-
 
 @app.route("/predict", methods=["POST"])
 def predict():
@@ -30,11 +22,11 @@ def predict():
         return jsonify({"error": "No image uploaded"}), 400
 
     try:
-        # Open + resize
+        # Open image and resize
         image = Image.open(file.stream).convert("RGB")
         image = image.resize((640, 640))
 
-        # Run YOLO
+        # Run YOLO prediction
         results = model.predict(image, verbose=False)
 
         # Annotated image
@@ -42,22 +34,22 @@ def predict():
         annotated_rgb = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)
         im_pil = Image.fromarray(annotated_rgb)
 
+        # Convert to base64
         buffer = io.BytesIO()
         im_pil.save(buffer, format="JPEG")
         img_str = base64.b64encode(buffer.getvalue()).decode("utf-8")
 
-        # Labels
+        # Collect labels
         all_labels = [model.names[int(box.cls[0])] for box in results[0].boxes]
         counts = Counter(all_labels)
-        text = ", ".join([f"{v} {k}{'s' if v > 1 else ''}" for k, v in counts.items()]) or "No objects detected"
+        text = ", ".join([f"{v} {k}{'s' if v>1 else ''}" for k, v in counts.items()]) or "No objects detected"
 
         return jsonify({"image": img_str, "text": text})
-
+    
     except Exception as e:
-        print("🔥 ERROR:", e, flush=True)  # This shows in Render logs
-        return jsonify({"error": "Prediction failed"}), 500
+        return jsonify({"error": str(e)}), 500
 
-
+# Render entry point
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
